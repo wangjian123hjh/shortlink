@@ -3,8 +3,11 @@ package com.nageoffer.shortlink.admin.controller;
 import cn.hutool.core.bean.BeanUtil;
 import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.common.convention.Results;
+import com.nageoffer.shortlink.admin.dto.req.UserLoginReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.UserRegisterReqDTO;
+import com.nageoffer.shortlink.admin.dto.req.UserUpdateReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ActualUserRespDTO;
+import com.nageoffer.shortlink.admin.dto.resp.UserLoginRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.UserRespDTO;
 import com.nageoffer.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +35,27 @@ public class UserController {
     @PostMapping("/api/short-link/admin/v1/user")
     public Result<Void> register(@RequestBody UserRegisterReqDTO requestParam){
         userService.Register(requestParam);
+        return Results.success();
+    }
+    @PutMapping("/api/short-link/admin/v1/user")
+    public Result<Void> update(@RequestBody UserUpdateReqDTO requestParam){
+        userService.update(requestParam);
+        return Results.success();
+    }
+    @PostMapping("/api/short-link/admin/v1/user/login")
+    public Result<UserLoginRespDTO> login(@RequestBody UserLoginReqDTO requestParam){
+        UserLoginRespDTO result = userService.login(requestParam);
+        return Results.success(result);
+    }
+
+    @GetMapping("/api/short-link/admin/v1/user/check-login")
+    public Result<Boolean> checkLogin(@RequestParam("username")String username,@RequestParam("token")String token){
+        Boolean flag = userService.checkLogin(username,token);
+        return Results.success(flag);
+    }
+    @DeleteMapping("/api/short-link/admin/v1/user/logout")
+    public Result<Void> logout(@RequestParam("username")String username,@RequestParam("token")String token){
+        userService.logout(username,token);
         return Results.success();
     }
 }
