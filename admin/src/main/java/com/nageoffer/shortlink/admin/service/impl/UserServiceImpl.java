@@ -64,6 +64,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 if (insert<1){
                     throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
                 }
+                // 将注册的用户名放置到布隆过滤器中
                 userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
                 return;
             }
