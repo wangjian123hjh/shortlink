@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nageoffer.shortlink.admin.common.biz.user.UserContext;
 import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.common.convention.Results;
 import com.nageoffer.shortlink.admin.dao.entity.GroupDO;
@@ -27,18 +28,22 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 break;
             }
         }
+        String username = UserContext.getUsername();
+
         GroupDO build = GroupDO.builder()
                 .gid(gid)
                 .name(requestParam.getName())
                 .sortOrder(0)
+                .username(UserContext.getUsername())
                 .build();
         baseMapper.insert(build);
     }
 
     @Override
     public Result<List<ShortLinkGroupRespDTO>> listGroup() {
+        String username = UserContext.getUsername();
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
-                .eq(GroupDO::getUsername, "1")
+                .eq(GroupDO::getUsername, UserContext.getUsername())
                 .eq(GroupDO::getDelFlag,0)
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
         List<GroupDO> groupDOS = baseMapper.selectList(queryWrapper);
@@ -49,7 +54,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     private boolean hasGid(String gid){
         LambdaQueryWrapper<GroupDO> lambdaQuery = Wrappers.lambdaQuery(GroupDO.class);
         lambdaQuery.eq(GroupDO::getGid,gid)
-                .eq(GroupDO::getUsername,null);
+                .eq(GroupDO::getUsername,UserContext.getUsername());
         GroupDO groupDO = baseMapper.selectOne(lambdaQuery);
         return groupDO==null;
     }
