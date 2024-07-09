@@ -10,6 +10,7 @@ import com.nageoffer.shortlink.admin.common.convention.Results;
 import com.nageoffer.shortlink.admin.dao.entity.GroupDO;
 import com.nageoffer.shortlink.admin.dao.mapper.GroupMapper;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupSaveReqDTO;
+import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupUpdateDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 import com.nageoffer.shortlink.admin.service.GroupService;
 import com.nageoffer.shortlink.admin.util.RandomGenerator;
@@ -28,8 +29,6 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 break;
             }
         }
-        String username = UserContext.getUsername();
-
         GroupDO build = GroupDO.builder()
                 .gid(gid)
                 .name(requestParam.getName())
@@ -49,6 +48,17 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         List<GroupDO> groupDOS = baseMapper.selectList(queryWrapper);
         List<ShortLinkGroupRespDTO> respDTOS = BeanUtil.copyToList(groupDOS, ShortLinkGroupRespDTO.class);
         return Results.success(respDTOS);
+    }
+
+    @Override
+    public void updateGroup(ShortLinkGroupUpdateDTO requestParam) {
+        LambdaQueryWrapper<GroupDO> lambdaQuery = Wrappers.lambdaQuery(GroupDO.class)
+                .eq(GroupDO::getUsername,UserContext.getUsername())
+                .eq(GroupDO::getGid,requestParam.getGid())
+                .eq(GroupDO::getDelFlag,0);
+        GroupDO groupDO = new GroupDO();
+        groupDO.setName(requestParam.getName());
+        baseMapper.update(groupDO,lambdaQuery);
     }
 
     private boolean hasGid(String gid){
