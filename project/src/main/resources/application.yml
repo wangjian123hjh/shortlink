@@ -2,14 +2,11 @@ server:
   port: 8002
 spring:
   datasource:
-  #    # ShardingSphere 对 Driver 自定义，实现分库分表等隐藏逻辑
-#    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
-#    # ShardingSphere 配置文件路径
-#    url: jdbc:shardingsphere:classpath:shardingsphere-config.yaml
-  driver-class-name: com.mysql.cj.jdbc.Driver
-  url: jdbc:mysql://127.0.0.1:3306/link
-  username: root
-  password: abc123
+      # ShardingSphere 对 Driver 自定义，实现分库分表等隐藏逻辑
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    # ShardingSphere 配置文件路径
+    url: jdbc:shardingsphere:classpath:shardingsphere-config.yaml
+
   data:
     redis:
       database: 0
