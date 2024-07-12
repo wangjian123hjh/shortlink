@@ -60,8 +60,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         RLock lock = redissonClient.getLock(RedisCacheConstant.LOCK_USER_REGISTER_KEY + requestParam.getUsername());
         try {
             if (lock.tryLock()){
-                int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
-                if (insert<1){
+                try{
+                    int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
+                    if (insert<1){
+                        throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
+                    }
+                }catch (Exception e){
                     throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
                 }
                 // 将注册的用户名放置到布隆过滤器中
