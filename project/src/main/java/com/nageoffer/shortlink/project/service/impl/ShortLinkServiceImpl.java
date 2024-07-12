@@ -2,6 +2,7 @@ package com.nageoffer.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -9,6 +10,7 @@ import com.nageoffer.shortlink.project.dao.entity.ShortLinkDO;
 import com.nageoffer.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
+import com.nageoffer.shortlink.project.dto.resp.ShortLinkCountQueryRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
@@ -21,6 +23,9 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import javax.sql.rowset.serial.SerialException;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,6 +33,8 @@ import javax.sql.rowset.serial.SerialException;
 public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLinkDO> implements ShortLinkService {
 
     private final RBloomFilter rBloomFilter;
+
+    private final ShortLinkMapper shortLinkMapper;
     @Override
     @SneakyThrows
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
@@ -74,6 +81,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .orderByDesc(ShortLinkDO::getCreateTime); // DESC 降序
         IPage<ShortLinkDO> resultPage = baseMapper.selectPage(requestParam, queryWrapper);
         return resultPage.convert(each -> BeanUtil.toBean(each,ShortLinkPageRespDTO.class));
+    }
+
+    @Override
+    public List<ShortLinkCountQueryRespDTO> listGroupShortLinkCount( List<String> gids) {
+        QueryWrapper<ShortLinkDO> queryWrapper = Wrappers.query(new ShortLinkDO()).select("gid,count(*) as shortLinkCount")
+                .in("gid", gids)
+                .eq("enable_status", 0)
+                .groupBy("gid");
+        List<Map<String, Object>> maps = baseMapper.selectMaps(queryWrapper);
+        List<ShortLinkCountQueryRespDTO> collect = maps.stream().map(each -> BeanUtil.mapToBean(each, ShortLinkCountQueryRespDTO.class, true)).collect(Collectors.toList());
+        return collect;
     }
 
     private String generateSuffix(ShortLinkCreateReqDTO requestParam) throws SerialException {

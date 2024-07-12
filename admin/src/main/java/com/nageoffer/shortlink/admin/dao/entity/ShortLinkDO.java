@@ -1,4 +1,4 @@
-package com.nageoffer.shortlink.project.dao.entity;
+package com.nageoffer.shortlink.admin.dao.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
