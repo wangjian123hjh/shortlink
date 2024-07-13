@@ -13,11 +13,13 @@ import com.nageoffer.shortlink.admin.common.convention.exception.ClientException
 import com.nageoffer.shortlink.admin.common.enums.UserErrorCodeEnum;
 import com.nageoffer.shortlink.admin.dao.entity.UserDO;
 import com.nageoffer.shortlink.admin.dao.mapper.UserMapper;
+import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupSaveReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.UserLoginReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.UserRegisterReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.UserUpdateReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.UserLoginRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.UserRespDTO;
+import com.nageoffer.shortlink.admin.service.GroupService;
 import com.nageoffer.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBloomFilter;
@@ -37,6 +39,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
+    private final GroupService groupService;
     @Override
     public UserRespDTO getUserByUsername(String username) {
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
@@ -68,6 +71,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 }catch (Exception e){
                     throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
                 }
+                ShortLinkGroupSaveReqDTO saveReqDTO = new ShortLinkGroupSaveReqDTO();
+                saveReqDTO.setName("默认分组");
+                groupService.saveGroup(saveReqDTO);
                 // 将注册的用户名放置到布隆过滤器中
                 userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
                 return;
