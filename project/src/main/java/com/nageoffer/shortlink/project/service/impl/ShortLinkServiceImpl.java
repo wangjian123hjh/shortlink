@@ -1,6 +1,7 @@
 package com.nageoffer.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -11,6 +12,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nageoffer.shortlink.project.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.project.common.enums.VailDateTypeEnum;
 import com.nageoffer.shortlink.project.dao.entity.ShortLinkDO;
+import com.nageoffer.shortlink.project.dao.entity.ShortLinkGotoDO;
 import com.nageoffer.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
@@ -18,8 +20,11 @@ import com.nageoffer.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkCountQueryRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
+import com.nageoffer.shortlink.project.service.ShortLinkGotoService;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
 import com.nageoffer.shortlink.project.util.HashUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +33,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import javax.sql.rowset.serial.SerialException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +46,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final RBloomFilter rBloomFilter;
 
     private final ShortLinkMapper shortLinkMapper;
+
+    private final ShortLinkGotoService shortLinkGotoService;
     @Override
     @SneakyThrows
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
@@ -59,13 +67,18 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .build();
         try {
             baseMapper.insert(shortLinkDO);
+            ShortLinkGotoDO shortLinkGotoDO = ShortLinkGotoDO.builder()
+                    .gid(shortLinkDO.getGid())
+                    .fullShortUrl(shortLinkDO.getFullShortUrl()).build();
+            shortLinkGotoService.save(shortLinkGotoDO);
         }catch (DuplicateKeyException e){
+            rBloomFilter.add(shortLinkDO.getFullShortUrl());
             LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
                     .eq(ShortLinkDO::getFullShortUrl, shortLinkDO.getFullShortUrl());
             ShortLinkDO hasShortLinkDO = baseMapper.selectOne(queryWrapper);
             if (hasShortLinkDO != null){
                 log.warn("短链接：{}重复入库",shortLinkDO.getFullShortUrl());
-                throw new SerialException("短链接生成重复");
+                throw new ClientException("短链接生成重复");
             }
 
         }
@@ -116,7 +129,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .eq(ShortLinkDO::getGid, requestParam.getGid())
                 .eq(ShortLinkDO::getDelFlag, 0)
                 .eq(ShortLinkDO::getEnableStatus, 0)
-                .set(ObjectUtil.equal(requestParam.getValidDateType(), VailDateTypeEnum.PERMANENT.getType()), ShortLinkDO::getValidDate, "null");
+                .set(ObjectUtil.equal(requestParam.getValidDateType(), VailDateTypeEnum.PERMANENT.getType()), ShortLinkDO::getValidDate, null);
         ShortLinkDO shortLinkDO = ShortLinkDO.builder()
                 .originUrl(requestParam.getOriginUrl())
                 .describe(requestParam.getDescribe())
@@ -124,6 +137,41 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .validDate(requestParam.getValidDate())
                 .build();
         baseMapper.update(shortLinkDO,updateWrapper);
+
+    }
+    // 短链接跳转
+    @Override
+    @SneakyThrows
+    public void restoreUrl(String shortUri, HttpServletRequest request, HttpServletResponse response) {
+        String serverName = request.getServerName();
+        String scheme = request.getScheme();
+        String fullShortUrl =scheme +"://"+ serverName + "/" + shortUri;
+        if (rBloomFilter.contains(fullShortUrl)){
+            LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
+                    .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
+            ShortLinkGotoDO linkGotoDO = shortLinkGotoService.getOne(queryWrapper);
+            if (linkGotoDO == null){
+                return;
+            }
+            LambdaQueryWrapper<ShortLinkDO> queryWrapper1 = Wrappers.lambdaQuery(ShortLinkDO.class)
+                    .eq(ShortLinkDO::getDelFlag, 0)
+                    .eq(ShortLinkDO::getEnableStatus, 0)
+                    .eq(ShortLinkDO::getGid, linkGotoDO.getGid())
+                    .eq(ShortLinkDO::getFullShortUrl, fullShortUrl);
+            ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper1);
+            if (shortLinkDO != null){
+                if (shortLinkDO.getValidDateType().equals(VailDateTypeEnum.CUSTOM) && shortLinkDO.getValidDate().isBefore(LocalDateTime.now())){
+                    // 过期  跳转到错误页面
+
+                    return;
+                }
+                String originUrl = shortLinkDO.getOriginUrl();
+                response.setStatus(302);
+                response.sendRedirect(originUrl);
+                return;
+            }
+        }
+        // 跳转到错误页面
 
     }
 
@@ -135,11 +183,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 throw new SerialException("短链接频繁生成,请稍后再试");
             }
             String originUrl = requestParam.getOriginUrl();
-            originUrl += System.currentTimeMillis();
             shortUri = HashUtil.hashToBase62(originUrl);
             if (!rBloomFilter.contains(requestParam.getDomain() + "/" + shortUri)){
                 break;
             }
+            originUrl += UUID.randomUUID().toString();
             customGenerateCount++;
         }
         return HashUtil.hashToBase62(shortUri);
