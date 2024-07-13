@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
+import com.nageoffer.shortlink.admin.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkCountQueryRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
@@ -42,5 +43,11 @@ public interface ShortLinkRemoteService {
         Result<List<ShortLinkCountQueryRespDTO>> iResult = JSON.parseObject(resultPage, new TypeReference<Result<List<ShortLinkCountQueryRespDTO>>>() {
         });
         return iResult;
+    }
+
+    default void updateShortLink(ShortLinkUpdateReqDTO requestParam){
+        String s = HttpUtil.post("http://127.0.0.1:8002/api/short-link/v1/update", JSON.toJSONString(requestParam));
+        Result result = JSON.parseObject(s, new TypeReference<Result>() {
+        });
     }
 }
