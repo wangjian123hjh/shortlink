@@ -8,6 +8,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nageoffer.shortlink.admin.common.biz.user.UserContext;
+import com.nageoffer.shortlink.admin.common.biz.user.UserInfoDTO;
 import com.nageoffer.shortlink.admin.common.constant.RedisCacheConstant;
 import com.nageoffer.shortlink.admin.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.admin.common.enums.UserErrorCodeEnum;
@@ -73,6 +75,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 }
                 ShortLinkGroupSaveReqDTO saveReqDTO = new ShortLinkGroupSaveReqDTO();
                 saveReqDTO.setName("默认分组");
+                UserInfoDTO userInfoDTO = new UserInfoDTO();
+                userInfoDTO.setUsername(requestParam.getUsername());
+                UserContext.setUser(userInfoDTO);
                 groupService.saveGroup(saveReqDTO);
                 // 将注册的用户名放置到布隆过滤器中
                 userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
