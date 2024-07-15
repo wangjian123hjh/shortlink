@@ -3,7 +3,7 @@ package com.nageoffer.shortlink.project.dto.req;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
 @Data
 public class ShortLinkUpdateReqDTO {
@@ -42,7 +42,7 @@ public class ShortLinkUpdateReqDTO {
      * 有效期
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss",timezone = "GMT+8")
-    private LocalDateTime validDate;
+    private Date validDate;
 
     /**
      * 描述

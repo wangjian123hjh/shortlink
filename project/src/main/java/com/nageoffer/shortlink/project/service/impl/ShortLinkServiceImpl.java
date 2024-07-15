@@ -25,6 +25,7 @@ import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.nageoffer.shortlink.project.service.ShortLinkGotoService;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
 import com.nageoffer.shortlink.project.util.HashUtil;
+import com.nageoffer.shortlink.project.util.LinkUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.sql.rowset.serial.SerialException;
-import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -89,8 +90,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 log.warn("短链接：{}重复入库",shortLinkDO.getFullShortUrl());
                 throw new ClientException("短链接生成重复");
             }
-
         }
+        // 缓存预热
+        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,shortLinkDO.getFullShortUrl()),requestParam.getOriginUrl(), LinkUtil.getLinkCacheValidDate(requestParam.getValidDate()),TimeUnit.SECONDS);
         rBloomFilter.add(shortLinkDO.getFullShortUrl());
         return ShortLinkCreateRespDTO.builder()
                 .fullShortUrl(shortLinkDO.getFullShortUrl())
@@ -184,7 +186,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .eq(ShortLinkDO::getFullShortUrl, fullShortUrl);
                 ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper1);
                 if (shortLinkDO != null){
-                    if (shortLinkDO.getValidDateType().equals(VailDateTypeEnum.CUSTOM) && shortLinkDO.getValidDate().isBefore(LocalDateTime.now())){
+                    if (shortLinkDO.getValidDateType().equals(VailDateTypeEnum.CUSTOM) && shortLinkDO.getValidDate().before(new Date())){
                         stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404",5,TimeUnit.MINUTES);
                         // 过期  跳转到错误页面
                         response.setStatus(302);
