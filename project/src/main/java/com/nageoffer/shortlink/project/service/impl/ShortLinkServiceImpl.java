@@ -41,6 +41,7 @@ import javax.sql.rowset.serial.SerialException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -184,13 +185,13 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper1);
                 if (shortLinkDO != null){
                     if (shortLinkDO.getValidDateType().equals(VailDateTypeEnum.CUSTOM) && shortLinkDO.getValidDate().isBefore(LocalDateTime.now())){
-                        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"404");
+                        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404",5,TimeUnit.MINUTES);
                         // 过期  跳转到错误页面
                         response.setStatus(302);
                         response.sendRedirect("404");
                         return;
                     }
-                    stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),shortLinkDO.getOriginUrl());
+                    stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),shortLinkDO.getOriginUrl(),5,TimeUnit.MINUTES);
                     orginalLink = shortLinkDO.getOriginUrl();
                     response.setStatus(302);
                     response.sendRedirect(orginalLink);
@@ -203,7 +204,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 }
             }else {
                 // 布隆过滤器没有说明一定不存在
-                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404");
+                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404",5, TimeUnit.MINUTES);
                 // 过期  跳转到错误页面
                 response.setStatus(302);
                 response.sendRedirect("/cc/404");
