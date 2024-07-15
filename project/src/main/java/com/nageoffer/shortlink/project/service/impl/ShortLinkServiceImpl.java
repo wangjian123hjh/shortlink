@@ -220,11 +220,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private String generateSuffix(ShortLinkCreateReqDTO requestParam) throws SerialException {
         int customGenerateCount = 0;
         String shortUri;
+        String originUrl = requestParam.getOriginUrl();
         while (true){
             if (customGenerateCount>10){
                 throw new SerialException("短链接频繁生成,请稍后再试");
             }
-            String originUrl = requestParam.getOriginUrl();
             shortUri = HashUtil.hashToBase62(originUrl);
             if (!rBloomFilter.contains(requestParam.getDomain() + "/" + shortUri)){
                 break;
@@ -232,6 +232,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             originUrl += UUID.randomUUID().toString();
             customGenerateCount++;
         }
-        return HashUtil.hashToBase62(shortUri);
+        return shortUri;
     }
 }

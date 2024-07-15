@@ -11,6 +11,9 @@ public class LinkUtil {
         if (valiDate == null){
             return ShortLinkConstant.DEFAULT_CACHE_VALID_TIME;
         }
-        return DateUtil.between(new Date(),valiDate, DateUnit.SECOND);
+        long l = DateUtil.between(new Date(), valiDate, DateUnit.SECOND);
+        if (l>ShortLinkConstant.DEFAULT_CACHE_VALID_TIME)
+            return ShortLinkConstant.DEFAULT_CACHE_VALID_TIME;
+        return l;
     }
 }
