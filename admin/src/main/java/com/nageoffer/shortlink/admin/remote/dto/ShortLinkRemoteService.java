@@ -50,4 +50,11 @@ public interface ShortLinkRemoteService {
         Result result = JSON.parseObject(s, new TypeReference<Result>() {
         });
     }
+
+    default Result<String> getTitleByUrl(String url){
+        String s = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/title?url="+url);
+        Result<String> result = JSON.parseObject(s, new TypeReference<Result<String>>() {
+        });
+        return result;
+    }
 }
