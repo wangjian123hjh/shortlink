@@ -187,29 +187,26 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper1);
                 if (shortLinkDO != null){
                     if (shortLinkDO.getValidDateType().equals(VailDateTypeEnum.CUSTOM) && shortLinkDO.getValidDate().before(new Date())){
-                        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404",5,TimeUnit.MINUTES);
+                        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/page/notfund",5,TimeUnit.MINUTES);
                         // 过期  跳转到错误页面
-                        response.setStatus(302);
-                        response.sendRedirect("404");
+                        response.sendRedirect("/page/notfund");
                         return;
                     }
-                    stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),shortLinkDO.getOriginUrl(),5,TimeUnit.MINUTES);
+                    stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),shortLinkDO.getOriginUrl(),LinkUtil.getLinkCacheValidDate(shortLinkDO.getValidDate()),TimeUnit.SECONDS);
                     orginalLink = shortLinkDO.getOriginUrl();
                     response.setStatus(302);
                     response.sendRedirect(orginalLink);
                     return;
                 }else {
-                    stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404");
-                    response.setStatus(302);
-                    response.sendRedirect("/cc/404");
+                    stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/page/notfund");
+                    response.sendRedirect("/page/notfund");
                     return;
                 }
             }else {
                 // 布隆过滤器没有说明一定不存在
-                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404",5, TimeUnit.MINUTES);
+                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/page/notfund",5, TimeUnit.MINUTES);
                 // 过期  跳转到错误页面
-                response.setStatus(302);
-                response.sendRedirect("/cc/404");
+                response.sendRedirect("/page/notfund");
             }
         }finally {
             lock.unlock();
