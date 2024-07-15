@@ -31,6 +31,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -39,6 +42,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.sql.rowset.serial.SerialException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +77,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .describe(requestParam.getDescribe())
                 .delFlag(0)
                 .shortUri(s)
+                .favicon(getFavicon(requestParam.getOriginUrl()))
                 .enableStatus(0)
                 .fullShortUrl(requestParam.getDomain()+"/"+s)
                 .build();
@@ -230,5 +236,22 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             customGenerateCount++;
         }
         return shortUri;
+    }
+    @SneakyThrows
+    private String getFavicon(String url){
+        URL urlC = new URL(url);
+        HttpURLConnection urlConnection = (HttpURLConnection)urlC.openConnection();
+        urlConnection.setRequestMethod("GET");
+        urlConnection.connect();
+        int responseCode = urlConnection.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK){
+            Document document = Jsoup.connect(url).get();
+            Element iconElement = document.select("link[rel~=(?i)^(shortcut|icon|favicon)]").first();
+            if (iconElement != null){
+                String href = iconElement.attr("href");
+                return href;
+            }
+        }
+        return null;
     }
 }
