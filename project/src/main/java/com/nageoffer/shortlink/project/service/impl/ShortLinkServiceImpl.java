@@ -3,12 +3,14 @@ package com.nageoffer.shortlink.project.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nageoffer.shortlink.project.common.constant.RedisKeyConstant;
 import com.nageoffer.shortlink.project.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.project.common.enums.VailDateTypeEnum;
 import com.nageoffer.shortlink.project.dao.entity.ShortLinkDO;
@@ -29,7 +31,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.sql.rowset.serial.SerialException;
@@ -46,6 +51,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final RBloomFilter rBloomFilter;
 
     private final ShortLinkMapper shortLinkMapper;
+    private final RedissonClient redissonClient;
+
+    private final StringRedisTemplate stringRedisTemplate;
 
     private final ShortLinkGotoService shortLinkGotoService;
     @Override
@@ -146,32 +154,63 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         String serverName = request.getServerName();
         String scheme = request.getScheme();
         String fullShortUrl =scheme +"://"+ serverName + "/" + shortUri;
-        if (rBloomFilter.contains(fullShortUrl)){
-            LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
-                    .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
-            ShortLinkGotoDO linkGotoDO = shortLinkGotoService.getOne(queryWrapper);
-            if (linkGotoDO == null){
+        String orginalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
+        if (StrUtil.isNotBlank(orginalLink)){
+            response.setStatus(302);
+            response.sendRedirect(orginalLink);
+            return;
+        }
+        RLock lock = redissonClient.getLock(String.format(RedisKeyConstant.LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
+        lock.lock();
+        try{
+            orginalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
+            if (StrUtil.isNotBlank(orginalLink)){
+                response.setStatus(302);
+                response.sendRedirect(orginalLink);
                 return;
             }
-            LambdaQueryWrapper<ShortLinkDO> queryWrapper1 = Wrappers.lambdaQuery(ShortLinkDO.class)
-                    .eq(ShortLinkDO::getDelFlag, 0)
-                    .eq(ShortLinkDO::getEnableStatus, 0)
-                    .eq(ShortLinkDO::getGid, linkGotoDO.getGid())
-                    .eq(ShortLinkDO::getFullShortUrl, fullShortUrl);
-            ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper1);
-            if (shortLinkDO != null){
-                if (shortLinkDO.getValidDateType().equals(VailDateTypeEnum.CUSTOM) && shortLinkDO.getValidDate().isBefore(LocalDateTime.now())){
-                    // 过期  跳转到错误页面
-
+            if (rBloomFilter.contains(fullShortUrl)){
+                LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
+                        .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
+                ShortLinkGotoDO linkGotoDO = shortLinkGotoService.getOne(queryWrapper);
+                if (linkGotoDO == null){
                     return;
                 }
-                String originUrl = shortLinkDO.getOriginUrl();
+                LambdaQueryWrapper<ShortLinkDO> queryWrapper1 = Wrappers.lambdaQuery(ShortLinkDO.class)
+                        .eq(ShortLinkDO::getDelFlag, 0)
+                        .eq(ShortLinkDO::getEnableStatus, 0)
+                        .eq(ShortLinkDO::getGid, linkGotoDO.getGid())
+                        .eq(ShortLinkDO::getFullShortUrl, fullShortUrl);
+                ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper1);
+                if (shortLinkDO != null){
+                    if (shortLinkDO.getValidDateType().equals(VailDateTypeEnum.CUSTOM) && shortLinkDO.getValidDate().isBefore(LocalDateTime.now())){
+                        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"404");
+                        // 过期  跳转到错误页面
+                        response.setStatus(302);
+                        response.sendRedirect("404");
+                        return;
+                    }
+                    stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),shortLinkDO.getOriginUrl());
+                    orginalLink = shortLinkDO.getOriginUrl();
+                    response.setStatus(302);
+                    response.sendRedirect(orginalLink);
+                    return;
+                }else {
+                    stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404");
+                    response.setStatus(302);
+                    response.sendRedirect("/cc/404");
+                    return;
+                }
+            }else {
+                // 布隆过滤器没有说明一定不存在
+                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),"/cc/404");
+                // 过期  跳转到错误页面
                 response.setStatus(302);
-                response.sendRedirect(originUrl);
-                return;
+                response.sendRedirect("/cc/404");
             }
+        }finally {
+            lock.unlock();
         }
-        // 跳转到错误页面
 
     }
 
