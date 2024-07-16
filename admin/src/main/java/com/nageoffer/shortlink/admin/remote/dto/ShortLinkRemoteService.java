@@ -6,6 +6,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
+import com.nageoffer.shortlink.admin.dto.req.RecycleBinDelReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.RecycleBinSaveReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkCountQueryRespDTO;
@@ -89,6 +90,16 @@ public interface ShortLinkRemoteService {
         map.put("gid",requestParam.getGid());
         map.put("fullShortUrl",requestParam.getFullShortUrl());
         String s = HttpUtil.post("http://127.0.0.1:8002/api/short-link/v1/recycle-bin/recover", JSONUtil.toJsonStr(map));
+        Result result = JSON.parseObject(s, new TypeReference<Result>() {
+        });
+        return result;
+    }
+
+    default Result removeRecycleBin(RecycleBinDelReqDTO requestParam){
+        Map<String,Object> map = new HashMap<>();
+        map.put("gid",requestParam.getGid());
+        map.put("fullShortUrl",requestParam.getFullShortUrl());
+        String s = HttpUtil.post("http://127.0.0.1:8002/api/short-link/v1/recycle-bin/remove", JSONUtil.toJsonStr(map));
         Result result = JSON.parseObject(s, new TypeReference<Result>() {
         });
         return result;

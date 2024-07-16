@@ -4,6 +4,7 @@ package com.nageoffer.shortlink.admin.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.common.convention.Results;
+import com.nageoffer.shortlink.admin.dto.req.RecycleBinDelReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.RecycleBinSaveReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.ShortLinkRemoteService;
 import com.nageoffer.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
@@ -37,5 +38,10 @@ public class RecycleBinController {
     public Result<Void> recoverRecycleBin(@RequestBody RecycleBinRecoverReqDTO requestParam){
         service.recoverRecycleBin(requestParam);
         return Results.success();
+    }
+
+    @PostMapping("/api/short-link/admin/v1/recycle-bin/remove")
+    public Result<Void> removeRecycleBin(@RequestBody RecycleBinDelReqDTO requestParam){
+        return service.removeRecycleBin(requestParam);
     }
 }
