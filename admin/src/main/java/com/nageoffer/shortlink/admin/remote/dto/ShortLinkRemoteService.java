@@ -9,8 +9,10 @@ import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.dto.req.RecycleBinSaveReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkCountQueryRespDTO;
+import com.nageoffer.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
+import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkRecycleBinPageReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 
@@ -71,14 +73,24 @@ public interface ShortLinkRemoteService {
     }
 
     // 分页查询回收站短链接
-    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleShortLink(ShortLinkPageReqDTO requestParam){
+    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleShortLink(ShortLinkRecycleBinPageReqDTO requestParam){
         Map<String,Object> requestMap = new HashMap<>();
-        requestMap.put("gid",requestParam.getGid());
+        requestMap.put("gids",requestParam.getGids());
         requestMap.put("current",requestParam.getCurrent());
         requestMap.put("size",requestParam.getSize());
         String resultPage = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/recycle-bin/page", requestMap);
         Result<IPage<ShortLinkPageRespDTO>> iPageResult = JSON.parseObject(resultPage, new TypeReference<Result<IPage<ShortLinkPageRespDTO>>>() {
         });
         return iPageResult;
+    }
+
+    default Result recoverRecycleBin(RecycleBinRecoverReqDTO requestParam) {
+        Map<String,Object> map = new HashMap<>();
+        map.put("gid",requestParam.getGid());
+        map.put("fullShortUrl",requestParam.getFullShortUrl());
+        String s = HttpUtil.post("http://127.0.0.1:8002/api/short-link/v1/recycle-bin/recover", JSONUtil.toJsonStr(map));
+        Result result = JSON.parseObject(s, new TypeReference<Result>() {
+        });
+        return result;
     }
 }
