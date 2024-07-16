@@ -69,4 +69,16 @@ public interface ShortLinkRemoteService {
         });
         return result;
     }
+
+    // 分页查询回收站短链接
+    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleShortLink(ShortLinkPageReqDTO requestParam){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("gid",requestParam.getGid());
+        requestMap.put("current",requestParam.getCurrent());
+        requestMap.put("size",requestParam.getSize());
+        String resultPage = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/recycle-bin/page", requestMap);
+        Result<IPage<ShortLinkPageRespDTO>> iPageResult = JSON.parseObject(resultPage, new TypeReference<Result<IPage<ShortLinkPageRespDTO>>>() {
+        });
+        return iPageResult;
+    }
 }
