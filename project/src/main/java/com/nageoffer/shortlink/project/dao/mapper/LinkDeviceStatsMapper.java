@@ -9,5 +9,5 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface LinkDeviceStatsMapper extends BaseMapper<LinkDeviceStatsDO> {
     @Insert("INSERT into t_link_device_stats(full_short_url,gid,date,cnt,device,create_time,update_time,del_flag)VALUES(#{linkDeviceStats.fullShortUrl},#{linkDeviceStats.gid},#{linkDeviceStats.date},#{linkDeviceStats.cnt},#{linkDeviceStats.device},NOW(),NOW(),0) on DUPLICATE key UPDATE cnt = cnt+#{linkDeviceStats.cnt};")
-    void shortLinkBrowserState(@Param("linkDeviceStats") LinkDeviceStatsDO linkDeviceStats);
+    void shortLinkDeviceState(@Param("linkDeviceStats") LinkDeviceStatsDO linkDeviceStats);
 }

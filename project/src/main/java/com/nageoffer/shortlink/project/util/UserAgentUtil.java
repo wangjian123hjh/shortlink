@@ -1,8 +1,10 @@
 package com.nageoffer.shortlink.project.util;
 
 import jakarta.servlet.http.HttpServletRequest;
+import ua_parser.Parser;
 
 public class UserAgentUtil {
+    private static Parser parser = new Parser();
     public static String getBrowser(HttpServletRequest request) {
         String userAgent = request.getHeader("User-Agent");
         if (userAgent == null) {
@@ -25,6 +27,7 @@ public class UserAgentUtil {
         } else {
             return "Unknown";
         }
+
     }
     public static String getOperatingSystem(HttpServletRequest request) {
         String userAgent = request.getHeader("User-Agent");
@@ -43,5 +46,18 @@ public class UserAgentUtil {
         } else {
             return "Unknown";
         }
+    }
+
+    public static String getDevice(HttpServletRequest request) {
+
+        String userAgent = request.getHeader("User-Agent");
+        if (userAgent == null) {
+            return "Unknown";
+        }
+        String s = userAgent.toLowerCase();
+        if (s.contains("mobile")){
+            return "Mobile";
+        }
+        return "PC";
     }
 }
