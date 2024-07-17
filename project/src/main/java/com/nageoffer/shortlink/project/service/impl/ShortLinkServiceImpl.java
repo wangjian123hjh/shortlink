@@ -56,6 +56,7 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -79,6 +80,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkBrowserStatsMapper linkBrowserStatsMapper;
 
     private final LinkOsStatsMapper linkOsStatsMapper;
+
+    private final LinkAccessLogMapper linkAccessLogMapper;
     @Value("${short-link.stats.locale.amap-key}")
     private String key;
     @Override
@@ -286,6 +289,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private void shortLinkstats(String fullShortUrl,String gid,HttpServletRequest request,HttpServletResponse response){
         try {
             AtomicBoolean uvFlag = new AtomicBoolean(true);
+            AtomicReference<String> uv = new AtomicReference<>();
             Cookie[] cookies = request.getCookies();
             if (ArrayUtil.isNotEmpty(cookies)){
                 Arrays.stream(cookies)
@@ -295,16 +299,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .ifPresentOrElse(each -> {
                             Long add = stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, each);
                             uvFlag.set((add!=null && add >0));
+                            uv.set(each);
                         },()->{
-                            String uv = UUID.fastUUID().toString();
-                            Cookie uvCookie = new Cookie("uv", uv);
+                            uv.set(UUID.fastUUID().toString());
+                            Cookie uvCookie = new Cookie("uv", uv.get());
                             uvCookie.setMaxAge(60*60*24*30);
                             uvCookie.setPath(StrUtil.sub(fullShortUrl,fullShortUrl.lastIndexOf("/"),fullShortUrl.length()));
                             response.addCookie(uvCookie);
                         });
             }else {
-                String uv = UUID.fastUUID().toString();
-                Cookie uvCookie = new Cookie("uv", uv);
+                uv.set(UUID.fastUUID().toString());
+                Cookie uvCookie = new Cookie("uv", uv.get());
                 uvCookie.setMaxAge(60*60*24*30);
                 uvCookie.setPath(StrUtil.sub(fullShortUrl,fullShortUrl.lastIndexOf("/"),fullShortUrl.length()));
                 response.addCookie(uvCookie);
@@ -379,6 +384,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .date(new Date())
                     .build();
             linkOsStatsMapper.shortLinkOsState(statsDO);
+            // 访问日志
+            LinkAccessLogDO accessLogDO = LinkAccessLogDO.builder()
+                    .user(uv.get())
+                    .ip(ip)
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .os(os)
+                    .browser(browser)
+                    .build();
+            linkAccessLogMapper.insert(accessLogDO);
         }catch (Exception e){
             log.error("短链接监控统计出错",e);
         }
