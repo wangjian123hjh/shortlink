@@ -30,6 +30,7 @@ import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.nageoffer.shortlink.project.service.ShortLinkGotoService;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
 import com.nageoffer.shortlink.project.util.HashUtil;
+import com.nageoffer.shortlink.project.util.IpUtil;
 import com.nageoffer.shortlink.project.util.LinkUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -298,7 +299,13 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 uvCookie.setPath(StrUtil.sub(fullShortUrl,fullShortUrl.lastIndexOf("/"),fullShortUrl.length()));
                 response.addCookie(uvCookie);
             }
-            if (gid == null){
+            String ip = IpUtil.getClientIp(request);
+            Long add = stringRedisTemplate.opsForSet().add("short-link:stats:uip:" + fullShortUrl, ip);
+            boolean uipFlag = false;
+            if (add!=null && add >0){
+                uipFlag = true;
+            }
+            if (StrUtil.isBlank(gid)){
                 LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
                         .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
                 ShortLinkGotoDO one = shortLinkGotoService.getOne(queryWrapper);
@@ -310,7 +317,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             LinkAccessStatsDO build = LinkAccessStatsDO.builder()
                     .pv(1)
                     .uv(uvFlag.get()?1:0)
-                    .uip(1)
+                    .uip(uipFlag?1:0)
                     .hour(hour)
                     .fullShortUrl(fullShortUrl)
                     .gid(gid)
