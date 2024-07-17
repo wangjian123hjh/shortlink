@@ -7,6 +7,9 @@ import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.HttpUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -17,9 +20,11 @@ import com.nageoffer.shortlink.project.common.constant.RedisKeyConstant;
 import com.nageoffer.shortlink.project.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.project.common.enums.VailDateTypeEnum;
 import com.nageoffer.shortlink.project.dao.entity.LinkAccessStatsDO;
+import com.nageoffer.shortlink.project.dao.entity.LinkLocaleStatsDO;
 import com.nageoffer.shortlink.project.dao.entity.ShortLinkDO;
 import com.nageoffer.shortlink.project.dao.entity.ShortLinkGotoDO;
 import com.nageoffer.shortlink.project.dao.mapper.LinkAccessStatsMapper;
+import com.nageoffer.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
 import com.nageoffer.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
@@ -44,6 +49,7 @@ import org.jsoup.nodes.Element;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -71,6 +77,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final ShortLinkGotoService shortLinkGotoService;
 
     private final LinkAccessStatsMapper linkAccessStatsMapper;
+    private static final  String AMAP_URL = "https://restapi.amap.com/v3/ip";
+
+    private final LinkLocaleStatsMapper linkLocaleStatsMapper;
+    @Value("${short-link.stats.locale.amap-key}")
+    private String key;
     @Override
     @SneakyThrows
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
@@ -326,6 +337,29 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .weekday(value)
                     .build();
             linkAccessStatsMapper.shortLinkStats(build);
+            // 地区统计
+            Map<String,Object> local = new HashMap<>();
+            local.put("key",key);
+            local.put("ip","121.43.132.118");
+            String s = HttpUtil.get(AMAP_URL, local);
+            JSONObject entries = JSONUtil.parseObj(s);
+            String infocode = entries.get("infocode").toString();
+            LinkLocaleStatsDO localeStatsDO=null;
+            if (StrUtil.isNotBlank(infocode) && infocode.equals("10000")){
+                String province = entries.get("province").toString();
+                Boolean unknowFlag = (StrUtil.isNotBlank(province) && province.indexOf("[")==0);
+                localeStatsDO = LinkLocaleStatsDO.builder()
+                        .fullShortUrl(fullShortUrl)
+                        .gid(gid)
+                        .province(unknowFlag ? "未知" : province)
+                        .city(unknowFlag ? "未知" : entries.get("city").toString())
+                        .adcode(unknowFlag ? "未知" : entries.get("adcode").toString())
+                        .country("中国")
+                        .date(new Date())
+                        .cnt(1)
+                        .build();
+            }
+            linkLocaleStatsMapper.shortLinkLocaleState(localeStatsDO);
         }catch (Exception e){
             log.error("短链接监控统计出错",e);
         }

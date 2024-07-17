@@ -19,3 +19,7 @@ spring:
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+short-link:
+  stats:
+    locale:
+      amap-key: ccac52b42db08d7a8f993fca8af058da
