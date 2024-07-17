@@ -19,13 +19,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nageoffer.shortlink.project.common.constant.RedisKeyConstant;
 import com.nageoffer.shortlink.project.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.project.common.enums.VailDateTypeEnum;
-import com.nageoffer.shortlink.project.dao.entity.LinkAccessStatsDO;
-import com.nageoffer.shortlink.project.dao.entity.LinkLocaleStatsDO;
-import com.nageoffer.shortlink.project.dao.entity.ShortLinkDO;
-import com.nageoffer.shortlink.project.dao.entity.ShortLinkGotoDO;
-import com.nageoffer.shortlink.project.dao.mapper.LinkAccessStatsMapper;
-import com.nageoffer.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
-import com.nageoffer.shortlink.project.dao.mapper.ShortLinkMapper;
+import com.nageoffer.shortlink.project.dao.entity.*;
+import com.nageoffer.shortlink.project.dao.mapper.*;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
@@ -37,6 +32,7 @@ import com.nageoffer.shortlink.project.service.ShortLinkService;
 import com.nageoffer.shortlink.project.util.HashUtil;
 import com.nageoffer.shortlink.project.util.IpUtil;
 import com.nageoffer.shortlink.project.util.LinkUtil;
+import com.nageoffer.shortlink.project.util.UserAgentUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -80,6 +76,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private static final  String AMAP_URL = "https://restapi.amap.com/v3/ip";
 
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
+    private final LinkBrowserStatsMapper linkBrowserStatsMapper;
+
+    private final LinkOsStatsMapper linkOsStatsMapper;
     @Value("${short-link.stats.locale.amap-key}")
     private String key;
     @Override
@@ -360,6 +359,26 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .build();
             }
             linkLocaleStatsMapper.shortLinkLocaleState(localeStatsDO);
+            // 浏览器统计
+            String browser = UserAgentUtil.getBrowser(request);
+            LinkBrowserStatsDO browserStatsDO = LinkBrowserStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .cnt(1)
+                    .browser(browser)
+                    .date(new Date())
+                    .build();
+            linkBrowserStatsMapper.shortLinkBrowserState(browserStatsDO);
+            // 操作系统统计
+            String os = UserAgentUtil.getOperatingSystem(request);
+            LinkOsStatsDO statsDO = LinkOsStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .cnt(1)
+                    .os(os)
+                    .date(new Date())
+                    .build();
+            linkOsStatsMapper.shortLinkOsState(statsDO);
         }catch (Exception e){
             log.error("短链接监控统计出错",e);
         }
