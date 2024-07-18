@@ -83,6 +83,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     private final LinkAccessLogMapper linkAccessLogMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
+
+    private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     @Value("${short-link.stats.locale.amap-key}")
     private String key;
     @Override
@@ -408,6 +410,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .delFlag(0)
                     .build();
             linkDeviceStatsMapper.shortLinkDeviceState(deviceStatsDO);
+            // 访问网络
+            LinkNetworkStatsDO networkStats = LinkNetworkStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .network(UserAgentUtil.getNetwork(request))
+                    .cnt(1)
+                    .date(new Date())
+                    .delFlag(0)
+                    .build();
+            linkNetworkStatsMapper.shortLinkBrowserState(networkStats);
         }catch (Exception e){
             log.error("短链接监控统计出错",e);
         }

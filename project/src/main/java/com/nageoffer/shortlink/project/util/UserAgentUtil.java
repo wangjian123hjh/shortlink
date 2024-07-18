@@ -60,4 +60,9 @@ public class UserAgentUtil {
         }
         return "PC";
     }
+
+    public static String getNetwork(HttpServletRequest request){
+        String ip = IpUtil.getClientIp(request);
+        return ip.startsWith("192.168.") || ip.startsWith("10.") ? "WIFI" : "Mobile";
+    }
 }
