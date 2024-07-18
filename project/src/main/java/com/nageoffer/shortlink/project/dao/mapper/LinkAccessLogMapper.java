@@ -62,6 +62,26 @@ public interface LinkAccessLogMapper extends BaseMapper<LinkAccessLogDO> {
             "        user " +
             ") AS user_counts;")
     HashMap<String, Object> findUvTypeCntByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
+//    @Select("<script> " +
+//            "SELECT " +
+//            "    user, " +
+//            "    CASE " +
+//            "        WHEN MIN(create_time) BETWEEN #{startDate} AND #{endDate} THEN '新访客' " +
+//            "        ELSE '老访客' " +
+//            "    END AS uvType " +
+//            "FROM " +
+//            "    t_link_access_logs " +
+//            "WHERE " +
+//            "    full_short_url = #{fullShortUrl} " +
+//            "    AND gid = #{gid} " +
+//            "    AND user IN " +
+//            "    <foreach item='item' index='index' collection='userAccessLogsList' open='(' separator=',' close=')'> " +
+//            "        #{item} " +
+//            "    </foreach> " +
+//            "GROUP BY " +
+//            "    user;" +
+//            "    </script>"
+//    )
     @Select("<script> " +
             "SELECT " +
             "    user, " +
@@ -72,12 +92,21 @@ public interface LinkAccessLogMapper extends BaseMapper<LinkAccessLogDO> {
             "FROM " +
             "    t_link_access_logs " +
             "WHERE " +
+            "    gid = #{gid} and" +
             "    full_short_url = #{fullShortUrl} " +
-            "    AND gid = #{gid} " +
-            "    AND user IN " +
-            "    <foreach item='item' index='index' collection='userAccessLogsList' open='(' separator=',' close=')'> " +
-            "        #{item} " +
-            "    </foreach> " +
+            "<choose>" +
+            "            <when test=\"userAccessLogsList != null and userAccessLogsList.size() > 0\">" +
+            "                AND user IN " +
+            "                (" +
+            "                    <foreach item=\"item\" index=\"index\" collection=\"userAccessLogsList\" open=\"\" separator=',' close=\"\">" +
+            "                        #{item}" +
+            "                    </foreach>" +
+            "                )" +
+            "            </when>" +
+            "            <otherwise>" +
+            "                AND user IN ('')" +
+            "            </otherwise>" +
+            "        </choose>" +
             "GROUP BY " +
             "    user;" +
             "    </script>"
@@ -118,5 +147,37 @@ public interface LinkAccessLogMapper extends BaseMapper<LinkAccessLogDO> {
             "    count DESC " +
             "LIMIT 5;")
     List<HashMap<String, Object>> listTopIpByGroup(@Param("param") ShortLinkGroupStatsReqDTO requestParam);
-
+    @Select("<script> " +
+            "SELECT " +
+            "    user, " +
+            "    CASE " +
+            "        WHEN MIN(create_time) BETWEEN #{startDate} AND #{endDate} THEN '新访客' " +
+            "        ELSE '老访客' " +
+            "    END AS uvType " +
+            "FROM " +
+            "    t_link_access_logs " +
+            "WHERE " +
+            "    gid = #{gid} " +
+            "<choose>" +
+            "            <when test=\"userAccessLogsList != null and userAccessLogsList.size() > 0\">" +
+            "                AND user IN " +
+            "                (" +
+            "                    <foreach item=\"item\" index=\"index\" collection=\"userAccessLogsList\" open=\"\" separator=',' close=\"\">" +
+            "                        #{item}" +
+            "                    </foreach>" +
+            "                )" +
+            "            </when>" +
+            "            <otherwise>" +
+            "                AND user IN ('')" +
+            "            </otherwise>" +
+            "        </choose>" +
+            "GROUP BY " +
+            "    user;" +
+            "    </script>"
+    )
+    List<Map<String, Object>> selectGroupUvTypeByUsers(
+            @Param("gid") String gid,
+            @Param("startDate") String startDate,
+            @Param("endDate") String endDate,
+            @Param("userAccessLogsList") List<String> userAccessLogsList);
 }

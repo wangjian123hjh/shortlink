@@ -3,10 +3,7 @@ package com.nageoffer.shortlink.admin.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.common.convention.Results;
-import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupStatsReqDTO;
-import com.nageoffer.shortlink.admin.dto.req.ShortLinkStatsAccessRecordReqDTO;
-import com.nageoffer.shortlink.admin.dto.req.ShortLinkStatsReqDTO;
-import com.nageoffer.shortlink.admin.dto.req.ShortLinkUpdateReqDTO;
+import com.nageoffer.shortlink.admin.dto.req.*;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsAccessRecordRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.ShortLinkRemoteService;
@@ -54,10 +51,16 @@ public class ShortLinkController {
         };
         return service.shortLinkStatsAccessRecord(requestParam);
     }
-    @GetMapping("/api/short-link/v1/stats/group")
+    @GetMapping("/api/short-link/admin/v1/stats/group")
     public Result<ShortLinkStatsRespDTO> groupShortLinkStats(ShortLinkGroupStatsReqDTO requestParam){
         ShortLinkRemoteService service = new ShortLinkRemoteService() {
         };
-        return Results.success(service.groupShortStats(requestParam));
+        return service.groupShortLinkStats(requestParam);
+    }
+    @GetMapping("/api/short-link/admin/v1/stats/access-record/group")
+    public Result<IPage<ShortLinkStatsAccessRecordRespDTO>> groupshortLinkStatsAccessRecordgroup(ShortLinkGroupStatsAccessRecordReqDTO requestParam){
+        ShortLinkRemoteService service = new ShortLinkRemoteService() {
+        };
+        return service.groupshortLinkStatsAccessRecord(requestParam);
     }
 }

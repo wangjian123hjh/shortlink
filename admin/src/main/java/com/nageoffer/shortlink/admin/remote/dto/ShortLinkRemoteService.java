@@ -130,13 +130,25 @@ public interface ShortLinkRemoteService {
         return Resultc;
     }
 
-    default Result<ShortLinkStatsRespDTO> groupShortLinkStats(ShortLinkStatsReqDTO requestParam){
+    default Result<ShortLinkStatsRespDTO> groupShortLinkStats(ShortLinkGroupStatsReqDTO requestParam){
         Map<String,Object> requestMap = new HashMap<>();
         requestMap.put("gid",requestParam.getGid());
         requestMap.put("startDate",requestParam.getStartDate());
         requestMap.put("endDate",requestParam.getEndDate());
         String result = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/stats/group", requestMap);
         Result<ShortLinkStatsRespDTO> Resultc = JSON.parseObject(result, new TypeReference<Result<ShortLinkStatsRespDTO>>() {
+        });
+        return Resultc;
+    }
+
+
+    default Result<IPage<ShortLinkStatsAccessRecordRespDTO>> groupshortLinkStatsAccessRecord(ShortLinkGroupStatsAccessRecordReqDTO requestParam){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("gid",requestParam.getGid());
+        requestMap.put("startDate",requestParam.getStartDate());
+        requestMap.put("endDate",requestParam.getEndDate());
+        String result = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/stats/access-record/group", requestMap);
+        Result<IPage<ShortLinkStatsAccessRecordRespDTO>> Resultc = JSON.parseObject(result, new TypeReference<Result<IPage<ShortLinkStatsAccessRecordRespDTO>>>() {
         });
         return Resultc;
     }
