@@ -1,12 +1,18 @@
 package com.nageoffer.shortlink.project.dao.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.Date;
 
 @Data
 @TableName("t_link_state_today")
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class LinkStatsTodayDO {
     @TableId(type = IdType.AUTO)
     /**

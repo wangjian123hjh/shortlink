@@ -85,6 +85,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
 
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
+    private final LinkStatsTodayMapper linkStatsTodayMapper;
     @Value("${short-link.stats.locale.amap-key}")
     private String key;
     @Override
@@ -100,6 +101,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .validDate(requestParam.getValidDate())
                 .describe(requestParam.getDescribe())
                 .delFlag(0)
+                .totalUv(0)
+                .totalPv(0)
+                .totalUip(0)
                 .shortUri(s)
                 .favicon(getFavicon(requestParam.getOriginUrl()))
                 .enableStatus(0)
@@ -426,6 +430,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .delFlag(0)
                     .build();
             linkNetworkStatsMapper.shortLinkBrowserState(networkStats);
+            baseMapper.incrementStats(gid,fullShortUrl,1,uvFlag.get()?1:0,uipFlag?1:0);
+            LinkStatsTodayDO build1 = LinkStatsTodayDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .date(new Date())
+                    .todayUv(1)
+                    .todayPv(uvFlag.get()?1:0)
+                    .todayUip(uipFlag?1:0)
+                    .delFlag(0)
+                    .build();
+            linkStatsTodayMapper.shortLinkTodayState(build1);
         }catch (Exception e){
             log.error("短链接监控统计出错",e);
         }
