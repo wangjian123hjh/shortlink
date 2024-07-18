@@ -352,14 +352,18 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             JSONObject entries = JSONUtil.parseObj(s);
             String infocode = entries.get("infocode").toString();
             LinkLocaleStatsDO localeStatsDO=null;
+            String province=null;
+            String city=null;
             if (StrUtil.isNotBlank(infocode) && infocode.equals("10000")){
-                String province = entries.get("province").toString();
+                province = entries.get("province").toString();
                 Boolean unknowFlag = (StrUtil.isNotBlank(province) && province.indexOf("[")==0);
+                province = unknowFlag ? "未知" : province;
+                city = unknowFlag ? "未知" : entries.get("city").toString();
                 localeStatsDO = LinkLocaleStatsDO.builder()
                         .fullShortUrl(fullShortUrl)
                         .gid(gid)
-                        .province(unknowFlag ? "未知" : province)
-                        .city(unknowFlag ? "未知" : entries.get("city").toString())
+                        .province(province)
+                        .city(city)
                         .adcode(unknowFlag ? "未知" : entries.get("adcode").toString())
                         .country("中国")
                         .date(new Date())
@@ -395,6 +399,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .fullShortUrl(fullShortUrl)
                     .gid(gid)
                     .os(os)
+                    .locale("中国-"+province+"-"+city)
+                    .network(UserAgentUtil.getNetwork(request))
                     .browser(browser)
                     .device(UserAgentUtil.getDevice(request))
                     .delFlag(0)

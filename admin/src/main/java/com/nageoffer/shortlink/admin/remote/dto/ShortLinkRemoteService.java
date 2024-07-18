@@ -8,8 +8,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.dto.req.RecycleBinDelReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.RecycleBinSaveReqDTO;
+import com.nageoffer.shortlink.admin.dto.req.ShortLinkStatsReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkCountQueryRespDTO;
+import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
@@ -103,5 +105,17 @@ public interface ShortLinkRemoteService {
         Result result = JSON.parseObject(s, new TypeReference<Result>() {
         });
         return result;
+    }
+
+    default Result<ShortLinkStatsRespDTO> oneShortLinkStats(ShortLinkStatsReqDTO requestParam){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("gid",requestParam.getGid());
+        requestMap.put("fullShortUrl",requestParam.getFullShortUrl());
+        requestMap.put("startDate",requestParam.getStartDate());
+        requestMap.put("endDate",requestParam.getEndDate());
+        String result = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/stats", requestMap);
+        Result<ShortLinkStatsRespDTO> Resultc = JSON.parseObject(result, new TypeReference<Result<ShortLinkStatsRespDTO>>() {
+        });
+        return Resultc;
     }
 }
