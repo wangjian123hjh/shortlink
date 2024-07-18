@@ -126,5 +126,21 @@ public class ShortLinkDO implements Serializable{
     @TableField(fill = FieldFill.INSERT)
     private Integer delFlag;
 
+    /**
+     * 今日PV
+     */
+    @TableField(exist = false)
+    private Integer todayPv;
 
+    /**
+     * 今日UV
+     */
+    @TableField(exist = false)
+    private Integer todayUv;
+
+    /**
+     * 今日UIP
+     */
+    @TableField(exist = false)
+    private Integer todayUip;
 }

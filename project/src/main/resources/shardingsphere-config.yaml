@@ -44,6 +44,8 @@ rules:
             # 分片算法，对应 rules[0].shardingAlgorithms
             shardingAlgorithmName: stats_table_hash_mod
     # 分片算法
+    bindingTables:
+      - t_link, t_link_stats_today
     shardingAlgorithms:
       # 数据表分片算法
       link_table_hash_mod:
