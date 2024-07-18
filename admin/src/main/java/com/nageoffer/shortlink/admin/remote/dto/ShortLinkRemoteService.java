@@ -6,11 +6,9 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
-import com.nageoffer.shortlink.admin.dto.req.RecycleBinDelReqDTO;
-import com.nageoffer.shortlink.admin.dto.req.RecycleBinSaveReqDTO;
-import com.nageoffer.shortlink.admin.dto.req.ShortLinkStatsReqDTO;
-import com.nageoffer.shortlink.admin.dto.req.ShortLinkUpdateReqDTO;
+import com.nageoffer.shortlink.admin.dto.req.*;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkCountQueryRespDTO;
+import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsAccessRecordRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
@@ -115,6 +113,18 @@ public interface ShortLinkRemoteService {
         requestMap.put("endDate",requestParam.getEndDate());
         String result = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/stats", requestMap);
         Result<ShortLinkStatsRespDTO> Resultc = JSON.parseObject(result, new TypeReference<Result<ShortLinkStatsRespDTO>>() {
+        });
+        return Resultc;
+    }
+
+    default Result<IPage<ShortLinkStatsAccessRecordRespDTO>>  shortLinkStatsAccessRecord(ShortLinkStatsAccessRecordReqDTO requestParam){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("gid",requestParam.getGid());
+        requestMap.put("fullShortUrl",requestParam.getFullShortUrl());
+        requestMap.put("startDate",requestParam.getStartDate());
+        requestMap.put("endDate",requestParam.getEndDate());
+        String result = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/stats/access-record", requestMap);
+        Result<IPage<ShortLinkStatsAccessRecordRespDTO>> Resultc = JSON.parseObject(result, new TypeReference<Result<IPage<ShortLinkStatsAccessRecordRespDTO>>>() {
         });
         return Resultc;
     }

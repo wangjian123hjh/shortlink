@@ -3,8 +3,10 @@ package com.nageoffer.shortlink.admin.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.common.convention.Results;
+import com.nageoffer.shortlink.admin.dto.req.ShortLinkStatsAccessRecordReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkStatsReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkUpdateReqDTO;
+import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsAccessRecordRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.ShortLinkRemoteService;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
@@ -44,5 +46,11 @@ public class ShortLinkController {
         ShortLinkRemoteService service = new ShortLinkRemoteService() {
         };
         return service.oneShortLinkStats(requestParam);
+    }
+    @GetMapping("/api/short-link/admin/v1/stats/access-record")
+    public Result<IPage<ShortLinkStatsAccessRecordRespDTO>> shortLinkStatsAccessRecord(ShortLinkStatsAccessRecordReqDTO requestParam){
+        ShortLinkRemoteService service = new ShortLinkRemoteService() {
+        };
+        return service.shortLinkStatsAccessRecord(requestParam);
     }
 }
