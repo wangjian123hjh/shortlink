@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.common.convention.Results;
 import com.nageoffer.shortlink.admin.dto.req.*;
+import com.nageoffer.shortlink.admin.dto.resp.ShortLinkBaseInfoRespDTO;
+import com.nageoffer.shortlink.admin.dto.resp.ShortLinkBatchCreateRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsAccessRecordRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.ShortLinkRemoteService;
@@ -11,10 +13,15 @@ import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
+import com.nageoffer.shortlink.admin.util.EasyExcelWebUtil;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.SneakyThrows;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 public class ShortLinkController {
@@ -62,5 +69,17 @@ public class ShortLinkController {
         ShortLinkRemoteService service = new ShortLinkRemoteService() {
         };
         return service.groupshortLinkStatsAccessRecord(requestParam);
+    }
+
+    @SneakyThrows
+    @PostMapping("/api/short-link/admin/v1/create/batch")
+    public void batchCreateShortLink(@RequestBody ShortLinkBatchCreateReqDTO requestParam, HttpServletResponse response){
+        ShortLinkRemoteService service = new ShortLinkRemoteService() {
+        };
+        Result<ShortLinkBatchCreateRespDTO> shortLinkBatchCreateRespDTOResult = service.batchCreateShortLink(requestParam);
+        if (shortLinkBatchCreateRespDTOResult.isSuccess()){
+            List<ShortLinkBaseInfoRespDTO> baseLinkInfos = shortLinkBatchCreateRespDTOResult.getData().getBaseLinkInfos();
+            EasyExcelWebUtil.write(response,"批量创建短链接",ShortLinkBaseInfoRespDTO.class,baseLinkInfos);
+        }
     }
 }

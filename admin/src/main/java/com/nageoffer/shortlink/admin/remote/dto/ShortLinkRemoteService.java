@@ -7,6 +7,7 @@ import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.Result;
 import com.nageoffer.shortlink.admin.dto.req.*;
+import com.nageoffer.shortlink.admin.dto.resp.ShortLinkBatchCreateRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkCountQueryRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsAccessRecordRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkStatsRespDTO;
@@ -149,6 +150,20 @@ public interface ShortLinkRemoteService {
         requestMap.put("endDate",requestParam.getEndDate());
         String result = HttpUtil.get("http://127.0.0.1:8002/api/short-link/v1/stats/access-record/group", requestMap);
         Result<IPage<ShortLinkStatsAccessRecordRespDTO>> Resultc = JSON.parseObject(result, new TypeReference<Result<IPage<ShortLinkStatsAccessRecordRespDTO>>>() {
+        });
+        return Resultc;
+    }
+
+    default Result<ShortLinkBatchCreateRespDTO> batchCreateShortLink(ShortLinkBatchCreateReqDTO requestParam){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("gid",requestParam.getGid());
+        requestMap.put("originUrls",requestParam.getOriginUrls());
+        requestMap.put("describes",requestParam.getDescribes());
+        requestMap.put("createdType",requestParam.getCreatedType());
+        requestMap.put("validDateType",requestParam.getValidDateType());
+        requestMap.put("validDate",requestParam.getValidDate());
+        String result = HttpUtil.post( "http://127.0.0.1:8002/api/short-link/v1/create/batch", JSON.toJSONString(requestParam));
+        Result<ShortLinkBatchCreateRespDTO> Resultc = JSON.parseObject(result, new TypeReference<Result<ShortLinkBatchCreateRespDTO>>() {
         });
         return Resultc;
     }
