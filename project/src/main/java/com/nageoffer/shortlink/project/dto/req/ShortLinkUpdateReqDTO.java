@@ -25,6 +25,9 @@ public class ShortLinkUpdateReqDTO {
      */
     private String originUrl;
 
+    private String originGid;
+
+
 
 
     /**

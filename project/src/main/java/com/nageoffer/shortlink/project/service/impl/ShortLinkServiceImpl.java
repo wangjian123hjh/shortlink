@@ -1,6 +1,7 @@
 package com.nageoffer.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.date.Week;
 import cn.hutool.core.lang.UUID;
@@ -10,6 +11,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -19,13 +21,16 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nageoffer.shortlink.project.common.constant.RedisKeyConstant;
 import com.nageoffer.shortlink.project.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.project.common.enums.VailDateTypeEnum;
+import com.nageoffer.shortlink.project.config.GotoDomainWhiteListConfiguration;
 import com.nageoffer.shortlink.project.dao.entity.*;
 import com.nageoffer.shortlink.project.dao.mapper.*;
+import com.nageoffer.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.project.dto.resp.*;
+import com.nageoffer.shortlink.project.service.LinkStatsTodayService;
 import com.nageoffer.shortlink.project.service.ShortLinkGotoService;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
 import com.nageoffer.shortlink.project.util.HashUtil;
@@ -43,6 +48,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
+import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
@@ -82,9 +88,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     private final LinkAccessLogMapper linkAccessLogMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
+    private final LinkStatsTodayService linkStatsTodayService;
 
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final LinkStatsTodayMapper linkStatsTodayMapper;
+
+    private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
     @Value("${short-link.stats.locale.amap-key}")
     private String key;
     @Value("${short-link.domain.default}")
@@ -92,6 +101,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Override
     @SneakyThrows
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
+        verificationWhitelist(requestParam.getOriginUrl());
         String s = generateSuffix(requestParam);
         ShortLinkDO shortLinkDO = ShortLinkDO.builder()
                 .domain(domainDefalueKey)
@@ -166,7 +176,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     public void updateShortLink(ShortLinkUpdateReqDTO requestParam) {
 
         LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .eq(ShortLinkDO::getGid, requestParam.getOriginGid())
                 .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
                 .eq(ShortLinkDO::getDelFlag, 0)
                 .eq(ShortLinkDO::getEnableStatus, 0);
@@ -174,21 +184,141 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         if (shortLink == null){
             throw new ClientException("短链接记录不存在");
         }
-        LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
-                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
-                .eq(ShortLinkDO::getGid, requestParam.getGid())
-                .eq(ShortLinkDO::getDelFlag, 0)
-                .eq(ShortLinkDO::getEnableStatus, 0)
-                .set(ObjectUtil.equal(requestParam.getValidDateType(), VailDateTypeEnum.PERMANENT.getType()), ShortLinkDO::getValidDate, "");
-        ShortLinkDO shortLinkDO = ShortLinkDO.builder()
-                .originUrl(requestParam.getOriginUrl())
-                .describe(requestParam.getDescribe())
-                .validDateType(requestParam.getValidDateType())
-                .validDate(requestParam.getValidDate())
-                .build();
-        baseMapper.update(shortLinkDO,updateWrapper);
-        if (!Objects.equals(requestParam.getValidDateType(),shortLinkDO.getValidDateType()) ||
-            !Objects.equals(requestParam.getValidDate(),shortLinkDO.getValidDate())){
+        if (Objects.equals(shortLink.getGid(),requestParam.getGid())){
+            LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
+                    .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
+                    .eq(ShortLinkDO::getGid, requestParam.getGid())
+                    .eq(ShortLinkDO::getDelFlag, 0)
+                    .eq(ShortLinkDO::getEnableStatus, 0)
+                    .set(ObjectUtil.equal(requestParam.getValidDateType(), VailDateTypeEnum.PERMANENT.getType()), ShortLinkDO::getValidDate, "");
+            ShortLinkDO shortLinkDO = ShortLinkDO.builder()
+                    .domain(shortLink.getDomain())
+                    .shortUri(shortLink.getShortUri())
+                    .favicon(shortLink.getFavicon())
+                    .createdType(shortLink.getCreatedType())
+                    .gid(requestParam.getGid())
+                    .originUrl(requestParam.getOriginUrl())
+                    .describe(requestParam.getDescribe())
+                    .validDateType(requestParam.getValidDateType())
+                    .validDate(requestParam.getValidDate())
+                    .build();
+            baseMapper.update(shortLinkDO,updateWrapper);
+        }else {
+            RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(RedisKeyConstant.LOCK_GID_UPDATE_KEY, requestParam.getFullShortUrl()));
+            RLock rLock = readWriteLock.writeLock();
+            rLock.lock();
+            try {
+                LambdaUpdateWrapper<ShortLinkDO> linkUpdateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
+                        .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(ShortLinkDO::getGid, shortLink.getGid())
+                        .eq(ShortLinkDO::getDelFlag, 0)
+                        .eq(ShortLinkDO::getDelTime, 0L)
+                        .eq(ShortLinkDO::getEnableStatus, 0);
+                ShortLinkDO delShortLinkDO = ShortLinkDO.builder()
+                        .delTime(System.currentTimeMillis())
+                        .build();
+                delShortLinkDO.setDelFlag(1);
+                baseMapper.update(delShortLinkDO, linkUpdateWrapper);
+                ShortLinkDO shortLinkDO = ShortLinkDO.builder()
+                        .domain(domainDefalueKey)
+                        .originUrl(requestParam.getOriginUrl())
+                        .gid(requestParam.getGid())
+                        .createdType(shortLink.getCreatedType())
+                        .validDateType(requestParam.getValidDateType())
+                        .validDate(requestParam.getValidDate())
+                        .describe(requestParam.getDescribe())
+                        .shortUri(shortLink.getShortUri())
+                        .enableStatus(shortLink.getEnableStatus())
+                        .totalPv(shortLink.getTotalPv())
+                        .totalUv(shortLink.getTotalUv())
+                        .totalUip(shortLink.getTotalUip())
+                        .fullShortUrl(shortLink.getFullShortUrl())
+                        .favicon(getFavicon(requestParam.getOriginUrl()))
+                        .delTime(0L)
+                        .build();
+                baseMapper.insert(shortLinkDO);
+                LambdaQueryWrapper<LinkStatsTodayDO> statsTodayQueryWrapper = Wrappers.lambdaQuery(LinkStatsTodayDO.class)
+                        .eq(LinkStatsTodayDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(LinkStatsTodayDO::getGid, shortLink.getGid())
+                        .eq(LinkStatsTodayDO::getDelFlag, 0);
+                List<LinkStatsTodayDO> linkStatsTodayDOList = linkStatsTodayMapper.selectList(statsTodayQueryWrapper);
+                if (CollUtil.isNotEmpty(linkStatsTodayDOList)) {
+                    linkStatsTodayMapper.deleteBatchIds(linkStatsTodayDOList.stream()
+                            .map(LinkStatsTodayDO::getId)
+                            .toList()
+                    );
+                    linkStatsTodayDOList.forEach(each -> each.setGid(requestParam.getGid()));
+                    linkStatsTodayService.saveBatch(linkStatsTodayDOList);
+                }
+                LambdaQueryWrapper<ShortLinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
+                        .eq(ShortLinkGotoDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(ShortLinkGotoDO::getGid, shortLink.getGid());
+                ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoService.getOne(linkGotoQueryWrapper);
+                shortLinkGotoService.removeById(shortLinkGotoDO.getId());
+                shortLinkGotoDO.setGid(requestParam.getGid());
+                shortLinkGotoService.save(shortLinkGotoDO);
+                LambdaUpdateWrapper<LinkAccessStatsDO> linkAccessStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkAccessStatsDO.class)
+                        .eq(LinkAccessStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(LinkAccessStatsDO::getGid, shortLink.getGid())
+                        .eq(LinkAccessStatsDO::getDelFlag, 0);
+                LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
+                        .gid(requestParam.getGid())
+                        .build();
+                linkAccessStatsMapper.update(linkAccessStatsDO, linkAccessStatsUpdateWrapper);
+                LambdaUpdateWrapper<LinkLocaleStatsDO> linkLocaleStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkLocaleStatsDO.class)
+                        .eq(LinkLocaleStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(LinkLocaleStatsDO::getGid, shortLink.getGid())
+                        .eq(LinkLocaleStatsDO::getDelFlag, 0);
+                LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
+                        .gid(requestParam.getGid())
+                        .build();
+                linkLocaleStatsMapper.update(linkLocaleStatsDO, linkLocaleStatsUpdateWrapper);
+                LambdaUpdateWrapper<LinkOsStatsDO> linkOsStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkOsStatsDO.class)
+                        .eq(LinkOsStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(LinkOsStatsDO::getGid, shortLink.getGid())
+                        .eq(LinkOsStatsDO::getDelFlag, 0);
+                LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
+                        .gid(requestParam.getGid())
+                        .build();
+                linkOsStatsMapper.update(linkOsStatsDO, linkOsStatsUpdateWrapper);
+                LambdaUpdateWrapper<LinkBrowserStatsDO> linkBrowserStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkBrowserStatsDO.class)
+                        .eq(LinkBrowserStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(LinkBrowserStatsDO::getGid, shortLink.getGid())
+                        .eq(LinkBrowserStatsDO::getDelFlag, 0);
+                LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
+                        .gid(requestParam.getGid())
+                        .build();
+                linkBrowserStatsMapper.update(linkBrowserStatsDO, linkBrowserStatsUpdateWrapper);
+                LambdaUpdateWrapper<LinkDeviceStatsDO> linkDeviceStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkDeviceStatsDO.class)
+                        .eq(LinkDeviceStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(LinkDeviceStatsDO::getGid, shortLink.getGid())
+                        .eq(LinkDeviceStatsDO::getDelFlag, 0);
+                LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
+                        .gid(requestParam.getGid())
+                        .build();
+                linkDeviceStatsMapper.update(linkDeviceStatsDO, linkDeviceStatsUpdateWrapper);
+                LambdaUpdateWrapper<LinkNetworkStatsDO> linkNetworkStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkNetworkStatsDO.class)
+                        .eq(LinkNetworkStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(LinkNetworkStatsDO::getGid, shortLink.getGid())
+                        .eq(LinkNetworkStatsDO::getDelFlag, 0);
+                LinkNetworkStatsDO linkNetworkStatsDO = LinkNetworkStatsDO.builder()
+                        .gid(requestParam.getGid())
+                        .build();
+                linkNetworkStatsMapper.update(linkNetworkStatsDO, linkNetworkStatsUpdateWrapper);
+                LambdaUpdateWrapper<LinkAccessLogDO> linkAccessLogsUpdateWrapper = Wrappers.lambdaUpdate(LinkAccessLogDO.class)
+                        .eq(LinkAccessLogDO::getFullShortUrl, requestParam.getFullShortUrl())
+                        .eq(LinkAccessLogDO::getGid, shortLink.getGid())
+                        .eq(LinkAccessLogDO::getDelFlag, 0);
+                LinkAccessLogDO linkAccessLogsDO = LinkAccessLogDO.builder()
+                        .gid(requestParam.getGid())
+                        .build();
+                linkAccessLogMapper.update(linkAccessLogsDO, linkAccessLogsUpdateWrapper);
+            } finally {
+                rLock.unlock();
+            }
+        }
+        if (!Objects.equals(requestParam.getValidDateType(),shortLink.getValidDateType()) ||
+            !Objects.equals(requestParam.getValidDate(),shortLink.getValidDate())){
             stringRedisTemplate.delete(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,requestParam.getFullShortUrl()));
         }
     }
@@ -333,7 +463,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         }
         return null;
     }
+    private void shortLinkStats(String fullShortUrl, String gid, ShortLinkStatsRecordDTO statsRecord){
+        Map<String,String> producerMap = new HashMap<>();
+        producerMap.put("fullShortUrl",fullShortUrl);
+        producerMap.put("gid",gid);
+        producerMap.put("statsRecord", JSON.toJSONString(statsRecord));
+
+    }
     private void shortLinkstats(String fullShortUrl,String gid,HttpServletRequest request,HttpServletResponse response){
+
+
         try {
             AtomicBoolean uvFlag = new AtomicBoolean(true);
             AtomicReference<String> uv = new AtomicReference<>();
@@ -485,5 +624,23 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             log.error("短链接监控统计出错",e);
         }
 
+    }
+
+
+    private void verificationWhitelist(String originUrl) {
+        Boolean enable = gotoDomainWhiteListConfiguration.getEnable();
+        if (enable == null || !enable) {
+            return;
+        }
+        String domain = LinkUtil.extractDomain(originUrl);
+        if (StrUtil.isBlank(domain)) {
+            throw new ClientException("跳转链接填写错误");
+        }
+        List<String> details =
+
+                gotoDomainWhiteListConfiguration.getDetails();
+        if (!details.contains(domain)) {
+            throw new ClientException("演示环境为避免恶意攻击，请生成以下网站跳转链接：" + gotoDomainWhiteListConfiguration.getNames());
+        }
     }
 }
