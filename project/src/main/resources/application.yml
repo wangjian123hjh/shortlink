@@ -25,7 +25,7 @@ short-link:
     default: http://nurl.ink:8002
   goto-domain:
     white-list:
-      enable: true
+      enable: false
       names: '拿个offer,知乎,掘金,博客园'
       details:
         - nageoffer.com

@@ -64,8 +64,29 @@ public class RedisStreamConfiguration {
         );
     }
 
-    @Bean(initMethod = "start", destroyMethod = "stop")
+//    @Bean(initMethod = "start", destroyMethod = "stop")
     public StreamMessageListenerContainer<String, MapRecord<String, String, String>> streamMessageListenerContainer(ExecutorService asyncStreamConsumer) {
+        StreamMessageListenerContainer.StreamMessageListenerContainerOptions<String, MapRecord<String, String, String>> options =
+                StreamMessageListenerContainer.StreamMessageListenerContainerOptions
+                        .builder()
+                        // 一次最多获取多少条消息
+                        .batchSize(1)
+                        // 执行从 Stream 拉取到消息的任务流程
+                        .executor(asyncStreamConsumer)
+                        // 如果没有拉取到消息，需要阻塞的时间。不能大于 ${spring.data.redis.timeout}，否则会超时
+                        .pollTimeout(Duration.ofSeconds(3))
+                        .build();
+        StreamMessageListenerContainer<String, MapRecord<String, String, String>> streamMessageListenerContainer =
+                StreamMessageListenerContainer.create(redisConnectionFactory, options);
+        streamMessageListenerContainer.receiveAutoAck(Consumer.from(SHORT_LINK_STATS_STREAM_GROUP_KEY, "stats-consumer"),
+                StreamOffset.create(SHORT_LINK_STATS_STREAM_TOPIC_KEY, ReadOffset.lastConsumed()), shortLinkStatsSaveConsumer);
+        return streamMessageListenerContainer;
+    }
+
+
+    @Bean(initMethod = "start", destroyMethod = "stop")
+    public StreamMessageListenerContainer<String, MapRecord<String, String, String>> createStreamMessageListenerContainer(ExecutorService asyncStreamConsumer){
+        // 配置 StreamMessageListenerContainerOptions
         StreamMessageListenerContainer.StreamMessageListenerContainerOptions<String, MapRecord<String, String, String>> options =
                 StreamMessageListenerContainer.StreamMessageListenerContainerOptions
                         .builder()
@@ -76,10 +97,25 @@ public class RedisStreamConfiguration {
                         // 如果没有拉取到消息，需要阻塞的时间。不能大于 ${spring.data.redis.timeout}，否则会超时
                         .pollTimeout(Duration.ofSeconds(3))
                         .build();
+
+        // 创建 StreamMessageListenerContainer
         StreamMessageListenerContainer<String, MapRecord<String, String, String>> streamMessageListenerContainer =
                 StreamMessageListenerContainer.create(redisConnectionFactory, options);
-        streamMessageListenerContainer.receiveAutoAck(Consumer.from(SHORT_LINK_STATS_STREAM_GROUP_KEY, "stats-consumer"),
-                StreamOffset.create(SHORT_LINK_STATS_STREAM_TOPIC_KEY, ReadOffset.lastConsumed()), shortLinkStatsSaveConsumer);
+
+        // 注册消费者
+        streamMessageListenerContainer.receiveAutoAck(
+                Consumer.from(SHORT_LINK_STATS_STREAM_GROUP_KEY, "stats-consumer"),
+                StreamOffset.create(SHORT_LINK_STATS_STREAM_TOPIC_KEY, ReadOffset.lastConsumed()),
+                records -> {
+                    if (records != null) {
+                            // 调用消费者处理每条记录
+                            shortLinkStatsSaveConsumer.onMessage(records);
+                    } else {
+                        // 处理空记录情况
+                        System.out.println("No records found");
+                    }
+                });
+
         return streamMessageListenerContainer;
     }
 }

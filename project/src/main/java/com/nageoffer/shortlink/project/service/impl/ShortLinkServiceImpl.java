@@ -30,6 +30,7 @@ import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.project.dto.resp.*;
+import com.nageoffer.shortlink.project.mq.producer.ShortLinkStatsSaveProducer;
 import com.nageoffer.shortlink.project.service.LinkStatsTodayService;
 import com.nageoffer.shortlink.project.service.ShortLinkGotoService;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
@@ -64,6 +65,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -93,6 +95,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final LinkStatsTodayMapper linkStatsTodayMapper;
 
+    private final ShortLinkStatsSaveProducer shortLinkStatsSaveProducer;
+
     private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
     @Value("${short-link.stats.locale.amap-key}")
     private String key;
@@ -118,7 +122,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .shortUri(s)
                 .favicon(getFavicon(requestParam.getOriginUrl()))
                 .enableStatus(0)
-                .fullShortUrl(requestParam.getDomain()+"/"+s)
+                .fullShortUrl(domainDefalueKey+"/"+s)
                 .build();
         try {
             baseMapper.insert(shortLinkDO);
@@ -337,7 +341,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         String orginalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
         if (StrUtil.isNotBlank(orginalLink)){
             if (!orginalLink.equals("/page/notfund")){
-                shortLinkstats(fullShortUrl,null,request,response);
+                shortLinkStats(fullShortUrl,null,request,response);
             }
             response.setStatus(302);
             response.sendRedirect(orginalLink);
@@ -349,7 +353,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             orginalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
             if (StrUtil.isNotBlank(orginalLink)){
                 if (!orginalLink.equals("/page/notfund")){
-                    shortLinkstats(fullShortUrl,null,request,response);
+                    shortLinkStats(fullShortUrl,null,request,response);
                 }
                 response.setStatus(302);
                 response.sendRedirect(orginalLink);
@@ -378,7 +382,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         response.sendRedirect("/page/notfund");
                         return;
                     }
-                    shortLinkstats(shortLinkDO.getFullShortUrl(),shortLinkDO.getGid(),request,response);
+                    shortLinkStats(shortLinkDO.getFullShortUrl(),shortLinkDO.getGid(),request,response);
                     stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,fullShortUrl),shortLinkDO.getOriginUrl(),LinkUtil.getLinkCacheValidDate(shortLinkDO.getValidDate()),TimeUnit.SECONDS);
                     orginalLink = shortLinkDO.getOriginUrl();
                     response.setStatus(302);
@@ -463,13 +467,62 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         }
         return null;
     }
-    private void shortLinkStats(String fullShortUrl, String gid, ShortLinkStatsRecordDTO statsRecord){
+    private void shortLinkStats(String fullShortUrl, String gid, HttpServletRequest request,HttpServletResponse response){
+        ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
         Map<String,String> producerMap = new HashMap<>();
         producerMap.put("fullShortUrl",fullShortUrl);
         producerMap.put("gid",gid);
         producerMap.put("statsRecord", JSON.toJSONString(statsRecord));
-
+        shortLinkStatsSaveProducer.send(producerMap);
     }
+
+    private ShortLinkStatsRecordDTO buildLinkStatsRecordAndSetUser(String fullShortUrl, HttpServletRequest request, HttpServletResponse response) {
+        AtomicBoolean uvFirstFlag = new AtomicBoolean();
+        Cookie[] cookies = ((HttpServletRequest) request).getCookies();
+        AtomicReference<String> uv = new AtomicReference<>();
+        Runnable addResponseCookieTask = () -> {
+            uv.set(UUID.fastUUID().toString());
+            Cookie uvCookie = new Cookie("uv", uv.get());
+            uvCookie.setMaxAge(60 * 60 * 24 * 30);
+            uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
+            ((HttpServletResponse) response).addCookie(uvCookie);
+            uvFirstFlag.set(Boolean.TRUE);
+            stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, uv.get());
+        };
+        if (ArrayUtil.isNotEmpty(cookies)) {
+            Arrays.stream(cookies)
+                    .filter(each -> Objects.equals(each.getName(), "uv"))
+                    .findFirst()
+                    .map(Cookie::getValue)
+                    .ifPresentOrElse(each -> {
+                        uv.set(each);
+                        Long uvAdded = stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, each);
+                        uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
+                    }, addResponseCookieTask);
+        } else {
+            addResponseCookieTask.run();
+        }
+        String remoteAddr = IpUtil.getClientIp(((HttpServletRequest) request));
+        String os = UserAgentUtil.getOperatingSystem(((HttpServletRequest) request));
+        String browser = UserAgentUtil.getBrowser(((HttpServletRequest) request));
+        String device = UserAgentUtil.getDevice(((HttpServletRequest) request));
+        String network = UserAgentUtil.getNetwork(((HttpServletRequest) request));
+        Long uipAdded = stringRedisTemplate.opsForSet().add("short-link:stats:uip:" + fullShortUrl, remoteAddr);
+        boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
+        return ShortLinkStatsRecordDTO.builder()
+                .fullShortUrl(fullShortUrl)
+                .uv(uv.get())
+                .uvFirstFlag(uvFirstFlag.get())
+                .uipFirstFlag(uipFirstFlag)
+                .remoteAddr(remoteAddr)
+                .os(os)
+                .browser(browser)
+                .device(device)
+                .network(network)
+                .build();
+    }
+
+
     private void shortLinkstats(String fullShortUrl,String gid,HttpServletRequest request,HttpServletResponse response){
 
 

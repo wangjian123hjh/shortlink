@@ -55,7 +55,7 @@ public class ShortLinkStatsSaveConsumer implements StreamListener<String, MapRec
     public void onMessage(MapRecord<String, String, String> message) {
         String stream = message.getStream();
         RecordId id = message.getId();
-        if (messageQueueIdempotentHandler.isMessageProcessed(id.toString())){
+        if (!messageQueueIdempotentHandler.isMessageProcessed(id.toString())){
             // 判断当前的这个消息流程是否执行完成
             if (messageQueueIdempotentHandler.isAccomplish(id.toString())){
                 return;
@@ -72,7 +72,7 @@ public class ShortLinkStatsSaveConsumer implements StreamListener<String, MapRec
             }
             stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),id.getValue());
         }catch (Throwable ex){
-            // 某情况下宕机了
+            // 某情况下宕机了 消费者重新消费
             messageQueueIdempotentHandler.delMessageProcessed(id.toString());
             log.error("记录短链接监控消费异常",ex);
             throw ex;
