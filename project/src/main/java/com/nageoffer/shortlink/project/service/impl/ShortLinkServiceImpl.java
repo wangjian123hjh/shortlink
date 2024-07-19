@@ -438,7 +438,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 throw new SerialException("短链接频繁生成,请稍后再试");
             }
             shortUri = HashUtil.hashToBase62(originUrl);
-            if (!rBloomFilter.contains(requestParam.getDomain() + "/" + shortUri)){
+            if (!rBloomFilter.contains(domainDefalueKey + "/" + shortUri)){
                 break;
             }
             originUrl += UUID.randomUUID().toString();
